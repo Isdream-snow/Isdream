@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>骑行数据收集</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    input, button { padding: 10px; margin: 5px 0; }
+    #ranking { margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h2>上传骑行数据</h2>
+  <input type="text" id="name" placeholder="姓名" />
+  <input type="text" id="distance" placeholder="行程（如 10km）" />
+  <input type="text" id="speed" placeholder="均速（如 15km/h）" />
+  <button onclick="submitData()">提交</button>
+  <button onclick="exportToCSV()">导出到本地</button>
+
+  <h3>实时排名</h3>
+  <div id="ranking"></div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+  <script>
+    // Firebase 配置（需替换为你的项目配置）
+    const firebaseConfig = {
+      apiKey: "AIzaSyCmg91sN9aOxUgxibzEwG5P8IitMQ3meuo",
+      authDomain: "isride-ca251.firebaseapp.com",
+      databaseURL: "https://isride-ca251-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "isride-ca251",
+      storageBucket: "isride-ca251.firebasestorage.app",
+      messagingSenderId: "297542899177",
+      appId: "1:297542899177:web:0511a52cd3f6f51f436778"
+    };
+
+    // 初始化 Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // 提交数据
+    function submitData() {
+      const name = document.getElementById("name").value.trim();
+      const distance = document.getElementById("distance").value.trim();
+      const speed = document.getElementById("speed").value.trim();
+
+      if (!name || !distance || !speed) {
+        alert("请填写完整信息！");
+        return;
+      }
+
+      db.ref("rides").push({ name, distance, speed });
+      alert("数据已提交！");
+      document.getElementById("name").value = "";
+      document.getElementById("distance").value = "";
+      document.getElementById("speed").value = "";
+    }
+
+    // 导出到本地 CSV
+    async function exportToCSV() {
+      const snapshot = await db.ref("rides").once("value");
+      const data = snapshot.val() || {};
+
+      const csvRows = [];
+      csvRows.push(["姓名", "行程", "均速"]);
+
+      for (const key in data) {
+        const { name, distance, speed } = data[key];
+        csvRows.push([name, distance, speed]);
+      }
+
+      const csvContent = csvRows.map(e => e.join(",")).join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      saveAs(blob, "riding_data.csv");
+    }
+
+    // 实时更新排名
+    db.ref("rides").on("value", snapshot => {
+      const data = snapshot.val() || {};
+      const rows = [];
+
+      for (const key in data) {
+        const { name, distance, speed } = data[key];
+        rows.push(`<div>${name} - 行程: ${distance}, 均速: ${speed}</div>`);
+      }
+
+      document.getElementById("ranking").innerHTML = rows.join("");
+    });
+  </script>
+</body>
+</html>

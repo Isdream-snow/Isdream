@@ -79,7 +79,7 @@ def download_database():
             backup_path,
             as_attachment=True,  # 作为附件下载
             download_name=backup_filename,
-            mimetype='application/x-sqlite3'
+            mimetype='application/x-sqlite3',
             conditional=True
         )
     except Exception as e:

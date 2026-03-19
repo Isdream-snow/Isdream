@@ -29,6 +29,13 @@
     <div class="container">
         <a href="/" class="back-link">← 返回主站</a>
         <a href="/admin/logout" style="color: #e74c3c; margin-left: 15px;">退出登录</a>
+        <div style="margin-bottom: 20px; display: flex; gap: 15px; align-items: center;">
+            <a href="/" class="back-link">← 返回主站</a>
+            <a href="/admin/download_db" style="padding: 10px 20px; background: linear-gradient(90deg, #3498db, #2980b9); color: white; text-decoration: none; border-radius: 8px; font-weight: 600; transition: all 0.3s ease;">
+            💾 下载数据库备份
+        </a>
+        <a href="/admin/logout" style="color: #e74c3c; text-decoration: none;">退出登录</a>
+    </div>
         <h1>🚴 骑行数据管理后台</h1>
         
         <div class="stats-bar">
@@ -91,6 +98,36 @@
     </div>
 
     <script>
+        // 检查上次备份时间
+        function checkBackupStatus() {
+        const lastBackup = localStorage.getItem('last_backup_time');
+        const now = new Date().getTime();
+
+        if (lastBackup) {
+            const daysSinceBackup = Math.floor((now - parseInt(lastBackup)) / (1000 * 60 * 60 * 24));
+
+            if (daysSinceBackup >= 7) { // 超过7天未备份
+                if (confirm(`您已经${daysSinceBackup}天没有备份数据库了，是否现在备份？`)) {
+                    window.location.href = '/admin/download_db';
+                }
+            }
+        }
+    }
+
+        // 记录备份时间
+        function recordBackup() {
+            localStorage.setItem('last_backup_time', new Date().getTime());
+        }
+
+        // 页面加载时检查
+        window.onload = function() {
+            checkBackupStatus();
+
+        // 如果当前页面是下载页面，记录备份时间
+            if (window.location.pathname.includes('/admin/download_db')) {
+                recordBackup();
+            }
+        };
         // 全局管理密码，从模板变量中获取
         function showMessage(text, isError = false) {
             const msgDiv = document.getElementById('message');

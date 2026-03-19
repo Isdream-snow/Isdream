@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, jsonify, session, redirect
+from flask import Flask, render_template, request, jsonify, session, redirect, send_file
+from datetime import datetime
 import sqlite3
 import hashlib
 import os
@@ -39,6 +40,129 @@ def get_ranking():
     results = cursor.fetchall()
     conn.close()
     return results
+
+@app.route('/admin/download_db')
+def download_database():
+    """下载数据库文件（仅管理员可访问）"""
+    # 验证管理员权限
+    if not session.get('is_admin'):
+        return "未授权访问", 403
+    
+     # 额外的安全验证：检查Referer，确保请求来自管理页面
+    referer = request.headers.get('Referer')
+    if referer and '/admin' not in referer:
+        # 可以记录这个可疑请求
+        print(f"可疑的数据库下载请求,Referer: {referer}")
+        # 不直接拒绝，但记录日志
+    
+    # 确保数据库文件存在
+    if not os.path.exists(DATABASE):
+        return "数据库文件不存在", 404
+    
+    try:
+        # 可选：在下载前创建临时备份（避免下载过程中数据被修改）
+        import shutil
+        import tempfile
+        
+        # 创建临时备份文件
+        temp_dir = tempfile.gettempdir()
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_filename = f'cycling_club_backup_{timestamp}.db'
+        backup_path = os.path.join(temp_dir, backup_filename)
+        
+        # 复制数据库文件到临时位置
+        shutil.copy2(DATABASE, backup_path)
+        
+        # 发送备份文件
+        # 发送数据库文件
+        return send_file(
+            backup_path,
+            as_attachment=True,  # 作为附件下载
+            download_name=backup_filename,
+            mimetype='application/x-sqlite3'
+            conditional=True
+        )
+    except Exception as e:
+        return f"下载失败: {str(e)}", 500
+
+@app.route('/admin/restore_db', methods=['GET', 'POST'])
+def restore_database():
+    """恢复数据库（仅管理员可访问）"""
+    if not session.get('is_admin'):
+        return "未授权访问", 403
+    
+    if request.method == 'POST':
+        # 检查是否上传了文件
+        if 'database_file' not in request.files:
+            return "没有选择文件", 400
+        
+        file = request.files['database_file']
+        
+        if file.filename == '':
+            return "没有选择文件", 400
+        
+        # 检查文件扩展名
+        if not file.filename.endswith('.db'):
+            return "只能上传.db文件", 400
+        
+        try:
+            # 备份当前数据库
+            if os.path.exists(DATABASE):
+                backup_name = f"{DATABASE}.backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                shutil.copy2(DATABASE, backup_name)
+                print(f"已创建备份: {backup_name}")
+            
+            # 保存上传的文件
+            file.save(DATABASE)
+            
+            return '''
+                <script>
+                    alert("数据库恢复成功！");
+                    window.location.href = "/admin";
+                </script>
+            '''
+        except Exception as e:
+            return f"恢复失败: {str(e)}", 500
+    
+    # GET请求显示上传表单
+    return '''
+    <!DOCTYPE html>
+    <html>
+    <head><title>恢复数据库</title></head>
+    <body>
+        <h1>恢复数据库</h1>
+        <p><strong>警告：</strong>此操作将覆盖当前所有数据！</p>
+        <form method="POST" enctype="multipart/form-data">
+            <input type="file" name="database_file" accept=".db" required>
+            <br><br>
+            <button type="submit" style="padding: 10px 20px; background: #e74c3c; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                确认恢复
+            </button>
+            <a href="/admin" style="margin-left: 20px;">取消</a>
+        </form>
+    </body>
+    </html>
+    '''
+
+@app.route('/admin/backups')
+def list_backups():
+    if not session.get('is_admin'):
+        return "未授权访问", 403
+
+    backups = []
+    for file in os.listdir('.'):
+        if file.startswith('cycling.db.backup.') or file.endswith('_backup.db'):
+            file_info = {
+                'name': file,
+                'size': os.path.getsize(file),
+                'time': datetime.fromtimestamp(os.path.getctime(file)).strftime('%Y-%m-%d %H:%M:%S')
+            }
+            backups.append(file_info)
+
+    # 按时间倒序排序
+    backups.sort(key=lambda x: x['time'], reverse=True)
+
+    return render_template('backup_list.html', backups=backups)
 
 # 修改原有的管理面板路由，添加登录检查
 @app.route('/admin')

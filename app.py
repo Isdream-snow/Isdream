@@ -17,7 +17,7 @@ blocked_ips = {}
 attack_log = []
 
 
-ADMIN_PASSWORD = "ZUISHUAIleiting666"
+ADMIN_PASSWORD = "ZUISHUAI6"
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
 DATABASE = 'database.db'
@@ -578,7 +578,7 @@ def index():
         name = sanitize_input(raw_name, max_length=12)
 
         if not name:
-            return jsonify({
+        return jsonify({
             "success": False,
             "message": "姓名不能为空或包含非法字符"
         }), 400
@@ -595,7 +595,7 @@ def index():
             ip_submit_count[client_ip] = []
         ip_submit_count[client_ip].append(time.time())
 
-        name = request.form['name']
+        
         distance = float(request.form['distance'])
         time_val = float(request.form['time'])
         date = request.form.get('date')
@@ -656,7 +656,6 @@ def get_ranking_json():
     start_date = request.args.get('start_date', '')
     end_date = request.args.get('end_date', '')
     search_name = request.args.get('search_name', '')
-    init_db()
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
     base_query = '''

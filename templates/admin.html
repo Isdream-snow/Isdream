@@ -94,7 +94,7 @@
                     <td>{{ "%.1f"|format(ride[3]|e) }}</td> <!-- time -->
                     <td>{{ ride[4] }}</td> <!-- date -->
                     <td>
-                        {% if ride[5]|e %}
+                        {% if ride[5] %}
                             <span class="anon-badge">已匿名</span>
                         {% else %}
                             <span style="color: #27ae60;">公开</span>
@@ -103,7 +103,7 @@
                     <td class="action-cell">
                         <button class="delete-btn" 
                             data-id="{{ ride[0] }}" 
-                            data-name="{% if ride[5] %}{{ ride[6] }}{% else %}{{ ride[1] }}{% endif %}"
+                            data-name="{% if ride[5] %}{{ ride[6]|e  }}{% else %}{{ ride[1]|e  }}{% endif %}"
                             onclick="deleteRecord(this.dataset.id, this.dataset.name)">删除</button>
                     </td>
                 </tr>

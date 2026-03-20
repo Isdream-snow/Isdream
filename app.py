@@ -7,7 +7,7 @@ import secrets
 
 
 
-ADMIN_PASSWORD = "ZUISHUAIleiting666"
+ADMIN_PASSWORD = "ZUISHUAILEITING666"
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
 DATABASE = 'database.db'

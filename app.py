@@ -58,8 +58,8 @@ def sanitize_input(input_string, max_length=50):
 def generate_math_captcha():
     """生成算术验证码"""
     ops = ['+', '-', '*']
-    a = random.randint(1, 10)
-    b = random.randint(1, 10)
+    a = random.randint(1,99)
+    b = random.randint(1, 9)
     op = random.choice(ops)
     
     if op == '+':

@@ -78,9 +78,8 @@
             </thead>
             <tbody>
                 {% for ride in rides %}
-                <tr>
-                    <tr id="row-{{ ride[0] }}">
-                        <td><input type="checkbox" class="row-checkbox" value="{{ ride[0] }}" onchange="updateSelectionCount()"></td>
+                <tr id="row-{{ ride[0] }}">
+                    <td><input type="checkbox" class="row-checkbox" value="{{ ride[0] }}" onchange="updateSelectionCount()"></td>
                     <td>{{ ride[0]|e }}</td> <!-- id -->
                     <td>
                         {% if ride[5] %} <!-- is_anonymous -->

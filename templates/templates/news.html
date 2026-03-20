@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>骑行社新闻 - 袁庚书院骑行社</title>
+    <!-- 复用主站样式 -->
+    <style>
+        /* 新闻卡片样式 */
+        .news-container { max-width: 800px; margin: 0 auto; }
+        .news-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            border-left: 5px solid #3498db;
+        }
+        .news-card h3 { color: #2c3e50; margin-bottom: 15px; }
+        .news-card .date { color: #7f8c8d; font-size: 0.9rem; margin-bottom: 10px; }
+        .champion-badge {
+            background: linear-gradient(90deg, #f39c12, #e67e22);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            display: inline-block;
+            margin: 5px 0;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        /* 侧边栏导航样式 */
+        .sidebar-nav {
+            position: fixed;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: white;
+            border-radius: 12px;
+            padding: 20px 10px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            z-index: 999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }   
+
+        .sidebar-nav a {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-decoration: none;
+            color: #7f8c8d;
+            padding: 12px 8px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            width: 100%;
+            text-align: center;
+        }
+
+        .sidebar-nav a:hover {
+            background-color: #f1f8ff;
+            color: #3498db;
+            transform: translateX(3px);
+        }
+
+        .sidebar-nav a.active {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            box-shadow: 0 4px 10px rgba(52, 152, 219, 0.3);
+        }
+
+        .sidebar-nav .icon {
+         font-size: 1.5rem;
+            margin-bottom: 5px;
+        }
+
+        .sidebar-nav .text {
+        font-size: 0.8rem;
+        font-weight: 500;
+        white-space: nowrap;
+        }
+
+        /* 为移动端优化 */
+        @media (max-width: 1100px) {
+            .sidebar-nav {
+            position: fixed;
+                bottom: 0;
+                top: auto;
+                left: 0;
+                right: 0;
+                transform: none;
+                flex-direction: row;
+                justify-content: space-around;
+                padding: 10px 5px;
+                border-radius: 15px 15px 0 0;
+                box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.1);
+            }
+    
+            .sidebar-nav a {
+            padding: 8px 5px;
+            }
+    
+            .sidebar-nav .text {
+                font-size: 0.7rem;
+            }
+    
+            .sidebar-nav .icon {
+                font-size: 1.3rem;
+                margin-bottom: 3px;
+            }
+    
+            /* 在移动端，为主内容增加底部内边距，防止被侧边栏遮挡 */
+            .container {
+                padding-bottom: 80px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="sidebar-nav">
+        <a href="/">
+            <div class="icon">🚴</div>
+            <div class="text">骑行数据</div>
+        </a>
+        <a href="/news" class="active"> <!-- 新闻页面链接高亮 -->
+            <div class="icon">📰</div>
+            <div class="text">新闻公告</div>
+        </a>
+    </nav>
+    <div class="container news-container">
+        <h1>📰 骑行社新闻与公告</h1>
+        <a href="/" class="back-link">← 返回排行榜</a>
+        
+        <!-- 本月冠军 -->
+        <div class="news-card">
+            <h3>🏆 本月骑行冠军</h3>
+            <div class="date">统计周期: {{ current_month_display|e }}</div>
+            {% if monthly_champs %}
+                {% for champ in monthly_champs %}
+                <div class="champion-badge">
+                    第{{ loop.index }}名: {{ champ[0]|e }} - {{ "%.1f"|format(champ[1]) }} km
+                </div>
+                {% endfor %}
+            {% else %}
+                <p style="color: #95a5a6;">本月暂无骑行数据，快来创造纪录吧！</p>
+            {% endif %}
+        </div>
+        
+        <!-- 社区统计数据 -->
+        <div class="news-card">
+            <h3>📊 社区统计</h3>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div style="font-size: 2rem; color: #3498db;">{{ total_riders }}</div>
+                    <div>活跃骑手</div>
+                </div>
+                <div class="stat-item">
+                    <div style="font-size: 2rem; color: #2ecc71;">{{ "%.1f"|format(total_distance) }}</div>
+                    <div>总里程 (km)</div>
+                </div>
+                <div class="stat-item">
+                    <div style="font-size: 2rem; color: #9b59b6;">{{ total_rides }}</div>
+                    <div>骑行次数</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 版本更新日志 -->
+        <div class="news-card">
+            <h3>🔄 版本更新日志</h3>
+            <div class="date">v0.0.1 - 2026年3月19日11:58</div>
+            <ul>
+                <li>✅ 基本功能完备</li>
+                <li>✅ 可以输入姓名，时间，路程，自动得出均速</li>
+                <li>✅ 可以按照速度/距离排名</li>
+                
+            </ul>
+            <div class="date">v0.0.2 - 2026年3月19日13:23</div>
+            <ul>
+                <li>✅ 新增日期属性和日期筛选功能</li>
+                <li>✅ 修改了均速结果的单位</li>
+                <li>✅ 修复了一些bug</li>
+                
+            </ul>
+            <div class="date">v0.0.3 - 2026年3月19日14:38</div>
+            <ul>
+                <li>✅ 页面CSS大设计,变得更加美观。</li>
+            </ul>
+            <div class="date">v0.0.4 - 2026年3月19日16:21</div>
+            <ul>
+                <li>✅ 修复了大量显示bug</li>
+                <li>✅ 增加了收起填写表单部分的功能</li>
+                <li>✅ 更加美观</li>
+                
+            </ul>
+            <div class="date">v0.0.5 - 2026年3月19日21:12</div>
+            <ul>
+                <li>✅ 新增个人(姓名)专属统计页面</li>
+                <li>✅ 新增管理员系统</li>
+                <li>✅ 新增匿名功能</li>
+                
+            </ul>
+            <div class="date" style="margin-top: 20px;">v0.0.6 - 2026年3月20日</div>
+            <ul>
+                <li>🎉 骑行社官方网站正式上线！</li>
+                <li>✅ 增加姓名搜索功能</li>
+                <li>✅ 管理员功能增加</li>
+            </ul>
+            <div class="date" style="margin-top: 20px;">v0.0.7 - 2026年3月20日</div>
+            <ul>
+                <li>✅ 增加新闻页面与侧边栏</li>
+                <li>✅ 加强网站安全</li>
+                <li>✅ 管理员功能增加</li>
+            </ul>
+        </div>
+        
+        <!-- 使用指南 -->
+        <div class="news-card">
+            <h3>📖 使用指南</h3>
+            <p><strong>如何提交数据？</strong><br>在首页填写表单即可，支持匿名提交。</p>
+            <p><strong>如何查看个人统计？</strong><br>点击排行榜中的姓名即可查看详细数据。</p>
+            <p><strong>如何成为月度冠军？</strong><br>每月骑行总里程最高的骑手将自动获得冠军称号！</p>
+        </div>
+    </div>
+</body>
+</html>

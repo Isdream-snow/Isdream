@@ -44,6 +44,11 @@
         overflow: hidden;
         padding: 30px;
     }
+    .search-highlight {
+        background-color: #fff9c4;  /* 黄色高亮 */
+        font-weight: bold;
+        padding: 2px 0;
+    }
     
     /* 标题样式 */
     h1 {
@@ -416,7 +421,7 @@
 </head>
 <body>
     <div class="container">
-    <h1>袁庚书院骑行兴趣小组官方网站v-0.0.6</h1>
+    <h1>袁庚书院骑行社官方网站version0.0.5</h1>
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
     <h2 style="margin: 0; border: none; padding: 0; color: #2c3e50;">填写新记录</h2>
     <button type="button" id="toggleFormBtn" style="padding: 6px 12px; background: #95a5a6; color: white; border: none; border-radius: 4px; cursor: pointer;">
@@ -460,6 +465,13 @@
     结束日期: <input type="date" id="endDate">
     <button onclick="applyFilter()">筛选</button>
     <button onclick="clearFilter()">清除筛选</button>
+    <div style="margin-top: 10px;">
+        姓名搜索: 
+        <input type="text" id="searchName" placeholder="输入姓名或匿名ID" 
+               style="padding: 8px; width: 200px; border: 2px solid #e0e0e0; border-radius: 6px;"
+               oninput="debouncedSearch()">
+        <button onclick="clearSearch()" style="padding: 8px 12px; background: #95a5a6; color: white; border: none; border-radius: 6px;">清空</button>
+    </div>
 </div>
     <h2>实时排行榜</h2>
     <select id="sortOption">
@@ -490,6 +502,17 @@
     <a href="/admin/login" style="color: inherit; text-decoration: none;">管理</a>
 </div>
 <script>
+    let searchTimer = null;
+    function debouncedSearch() {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+            fetchRanking(document.getElementById('sortOption').value);
+        }, 300);  // 输入停止300ms后搜索
+    }
+    function clearSearch() {
+        document.getElementById('searchName').value = '';
+        fetchRanking(document.getElementById('sortOption').value);
+    }
     let isUpdatingRanking = false
     // 每5秒刷新排名
     function fetchRanking(sortBy = 'distance') {
@@ -500,10 +523,12 @@
         isUpdatingRanking = true;
     const startDate = document.getElementById('startDate').value;
     const endDate = document.getElementById('endDate').value;
+    const searchName = document.getElementById('searchName').value;
+
     let url = `/get_ranking?sort_by=${sortBy}`;
     if (startDate) url += `&start_date=${startDate}`;
     if (endDate) url += `&end_date=${endDate}`;
-    
+    if (searchName) url += `&search_name=${encodeURIComponent(searchName)}`;
     const tbody = document.getElementById('ranking');
     const oldRows = Array.from(tbody.querySelectorAll('tr')); // 获取现有行
     const hasOldData = oldRows.length > 0 && !tbody.querySelector('.loading, .empty-state');

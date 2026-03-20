@@ -7,7 +7,7 @@ import secrets
 
 
 
-ADMIN_PASSWORD = "ZUISHUAILEITING666"
+ADMIN_PASSWORD = "ZUISHUAIleiting666"
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
 DATABASE = 'database.db'
@@ -415,6 +415,7 @@ def get_ranking_json():
     sort_by = request.args.get('sort_by', 'distance')
     start_date = request.args.get('start_date', '')
     end_date = request.args.get('end_date', '')
+    search_name = request.args.get('search_name', '')
     init_db()
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
@@ -437,7 +438,11 @@ def get_ranking_json():
     if end_date:
         conditions.append("date <= ?")
         params.append(end_date)
-    
+    if search_name:
+        # 同时搜索真实姓名和匿名ID
+        conditions.append("(name LIKE ? OR anonymous_id LIKE ?)")
+        params.append(f"%{search_name}%")
+        params.append(f"%{search_name}%")
     if conditions:
         base_query += " AND " + " AND ".join(conditions)
     if sort_by == 'distance':

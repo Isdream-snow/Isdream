@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <title>{{ name }} 的骑行统计 - 袁庚书院骑行社</title>
+    <title>{{ name|e }} 的骑行统计 - 袁庚书院骑行社</title>
     <!-- 复用主站的样式 -->
     <style>
         * {
@@ -250,10 +250,10 @@
         <p>🌍 这是公开的骑行统计页面，所有数据对社团成员可见。</p>
         </div>
         {% endif %}
-        <h1>{{ name }} 的骑行统计</h1>
+        <h1>{{ name|e }} 的骑行统计</h1>
         {% if not has_data %}
         <div class="no-data">
-            <p>暂无 {{ name }} 的骑行记录</p>
+            <p>暂无 {{ name|e }} 的骑行记录</p>
         </div>
         {% else %}
         

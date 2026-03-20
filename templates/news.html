@@ -144,11 +144,11 @@
         <!-- 本月冠军 -->
         <div class="news-card">
             <h3>🏆 本月骑行冠军</h3>
-            <div class="date">统计周期: {{ current_month_display }}</div>
+            <div class="date">统计周期: {{ current_month_display|e }}</div>
             {% if monthly_champs %}
                 {% for champ in monthly_champs %}
                 <div class="champion-badge">
-                    第{{ loop.index }}名: {{ champ[0] }} - {{ "%.1f"|format(champ[1]) }} km
+                    第{{ loop.index }}名: {{ champ[0]|e }} - {{ "%.1f"|format(champ[1]) }} km
                 </div>
                 {% endfor %}
             {% else %}

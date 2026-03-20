@@ -7,6 +7,8 @@ import hashlib
 import os
 import secrets 
 import random
+import html
+import re
 
 ip_submit_count = defaultdict(list)
 IP_LIMIT = 5  # 每个IP每分钟最多5次提交
@@ -19,6 +21,38 @@ ADMIN_PASSWORD = "ZUISHUAIleiting666"
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
 DATABASE = 'database.db'
+
+def sanitize_input(input_string, max_length=50):
+    """
+    清理用户输入，防止XSS攻击
+    - 移除HTML标签
+    - 转义特殊字符
+    - 限制长度
+    """
+    if not input_string:
+        return ""
+    
+    # 限制长度
+    if len(input_string) > max_length:
+        input_string = input_string[:max_length]
+    
+    # 移除所有HTML标签（允许基本标点）
+    # 只允许中文、英文、数字、空格和常见标点
+    cleaned = re.sub(r'[<>\"\'&;]', '', input_string)
+    
+    # 额外的安全：移除可能危险的字符
+    dangerous_patterns = [
+        r'javascript:', r'onclick=', r'onload=', r'onerror=',
+        r'onmouseover=', r'alert\(', r'prompt\(', r'confirm\(',
+        r'eval\(', r'<script', r'</script>', r'<iframe',
+        r'<img', r'<svg', r'<body', r'<meta'
+    ]
+    
+    for pattern in dangerous_patterns:
+        cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE)
+    
+    return cleaned.strip()
+
 def generate_math_captcha():
     """生成算术验证码"""
     ops = ['+', '-', '*']
@@ -194,7 +228,8 @@ def news_page():
                           total_riders=total_riders,
                           total_distance=total_distance,
                           total_rides=total_rides,
-                          current_month_display=current_month_display)
+                          current_month_display=current_month_display
+                          )
 
 
 @app.route('/admin/download_db')
@@ -517,7 +552,6 @@ def user_stats(identifier):
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-
     if request.method == 'POST':
         user_answer = request.form.get('captcha', '').strip()
         correct_answer = session.get('captcha_answer', '')
@@ -540,6 +574,22 @@ def index():
             log_attack(client_ip, "频率限制", f"1分钟内提交{len(ip_submit_count.get(client_ip, []))}次")
             return jsonify({"success": False, "message": msg}), 429
 
+        raw_name = request.form['name']
+        name = sanitize_input(raw_name, max_length=12)
+
+        if not name:
+            return jsonify({
+            "success": False,
+            "message": "姓名不能为空或包含非法字符"
+        }), 400
+        raw_date = request.form.get('date', '')
+        if raw_date:
+            # 验证日期格式：YYYY-MM-DD
+            if not re.match(r'^\d{4}-\d{2}-\d{2}$', raw_date):
+                return jsonify({
+                    "success": False,
+                    "message": "日期格式无效，请使用YYYY-MM-DD格式"
+                }), 400
         # 记录本次提交
         if client_ip not in ip_submit_count:
             ip_submit_count[client_ip] = []
@@ -547,7 +597,7 @@ def index():
 
         name = request.form['name']
         distance = float(request.form['distance'])
-        time = float(request.form['time'])
+        time_val = float(request.form['time'])
         date = request.form.get('date')
         is_anonymous = request.form.get('is_anonymous') == '1'
         anonymous_id = None
@@ -570,6 +620,9 @@ def index():
             # 公开提交，anonymous_id 为 NULL
             anonymous_id = None
         # 处理上传数据
+        if client_ip not in ip_submit_count:
+            ip_submit_count[client_ip] = []
+        ip_submit_count[client_ip].append(time.time())
         
         
         display_name = name
@@ -579,7 +632,7 @@ def index():
         cursor.execute('''
             INSERT INTO rides (name, distance, time, date, is_anonymous, anonymous_id) 
             VALUES (?, ?, ?, ?, ?, ?)
-        ''',(name, distance, time, date, 1 if is_anonymous else 0, anonymous_id))
+        ''',(name, distance, time_val, date, 1 if is_anonymous else 0, anonymous_id))
         conn.commit()
         conn.close()
         return jsonify({
@@ -661,6 +714,37 @@ def get_ranking_json():
         })
     
     return jsonify(formatted_results)
+
+@app.after_request
+def add_security_headers(response):
+    """
+    添加安全相关的HTTP头部，提供额外的XSS防护层。
+    """
+    # 内容安全策略 (CSP) - 严格限制资源加载
+    # 注意：如果未来需要加载更多外部资源（如图标、字体），需在此添加
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "  # 允许本站脚本和Chart.js
+        "style-src 'self' 'unsafe-inline'; "  # 允许内联样式
+        "img-src 'self' data:; "  # 允许本站图片和dataURL
+        "font-src 'self'; "
+        "connect-src 'self'; "  # 限制AJAX请求到同源
+        "frame-ancestors 'none';"  # 禁止页面被嵌入（防点击劫持）
+    )
+    
+    # 防止浏览器猜测MIME类型
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    
+    # 防止点击劫持
+    response.headers['X-Frame-Options'] = 'DENY'
+    
+    # 启用浏览器的XSS过滤器
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    
+    # 控制Referrer信息
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    
+    return response
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

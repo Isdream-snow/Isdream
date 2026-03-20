@@ -512,10 +512,6 @@
             <div class="icon">🚴</div>
             <div class="text">骑行数据</div>
         </a>
-        <a href="/news">
-            <div class="icon">📰</div>
-            <div class="text">新闻公告</div>
-        </a>
     </nav>
     <div class="container">
     <a href="/news" style="color: inherit; text-decoration: none; margin-right: 15px;">📰 新闻公告</a>
@@ -626,51 +622,70 @@
     let searchTimer = null;
     function debouncedSearch() {
         clearTimeout(searchTimer);
+        const tbody = document.getElementById('ranking');
+        const oldRows = tbody.querySelectorAll('tr');
+        if (oldRows.length > 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="loading">搜索中...</td></tr>';
+        }
         searchTimer = setTimeout(() => {
             fetchRanking(document.getElementById('sortOption').value);
         }, 300);  // 输入停止300ms后搜索
     }
+
     function clearSearch() {
         document.getElementById('searchName').value = '';
         fetchRanking(document.getElementById('sortOption').value);
     }
     let isUpdatingRanking = false
     // 每5秒刷新排名
+
+    function escapeHtml(text) {
+    if (!text) return '';
+        return text
+            .toString()
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }   
+
     function fetchRanking(sortBy = 'distance') {
          if (isUpdatingRanking) {
             console.log('数据更新中，跳过此次重复调用。');
             return;
         }
         isUpdatingRanking = true;
-    const startDate = document.getElementById('startDate').value;
-    const endDate = document.getElementById('endDate').value;
-    const searchName = document.getElementById('searchName').value;
+        const startDate = document.getElementById('startDate').value;
+        const endDate = document.getElementById('endDate').value;
+        const searchName = document.getElementById('searchName').value;
 
-    let url = `/get_ranking?sort_by=${sortBy}`;
-    if (startDate) url += `&start_date=${startDate}`;
-    if (endDate) url += `&end_date=${endDate}`;
-    if (searchName) url += `&search_name=${encodeURIComponent(searchName)}`;
-    const tbody = document.getElementById('ranking');
-    const oldRows = Array.from(tbody.querySelectorAll('tr')); // 获取现有行
-    const hasOldData = oldRows.length > 0 && !tbody.querySelector('.loading, .empty-state');
-    
-    // 1. 为旧数据添加淡出动画（如果有的话）
-    if (hasOldData) {
-        const fadeOutPromises = oldRows.map(tr => {
-            return new Promise(resolve => {
-                tr.classList.add('tr-fade-out');
-                tr.addEventListener('animationend', resolve, { once: true });
-            });
-        });
-        Promise.all(fadeOutPromises).then(() => {
-            // 此时旧行已不可见，可以安全地发送请求
-            fetchAndUpdateTable(url, tbody, startDate, endDate);
-        });
-    } else {
-        // 如果没有旧数据（如初始状态、空状态），直接显示加载提示
-        tbody.innerHTML = '<tr><td colspan="6" class="loading">加载中...</td></tr>';
-        fetchAndUpdateTable(url, tbody, startDate, endDate);
+        let url = `/get_ranking?sort_by=${sortBy}`;
+        if (startDate) url += `&start_date=${startDate}`;
+        if (endDate) url += `&end_date=${endDate}`;
+        if (searchName) url += `&search_name=${encodeURIComponent(searchName)}`;
+
+        const tbody = document.getElementById('ranking');
+        const oldRows = Array.from(tbody.querySelectorAll('tr')); // 获取现有行
+        const hasOldData = oldRows.length > 0 && !tbody.querySelector('.loading, .empty-state');
         
+    // 1. 为旧数据添加淡出动画（如果有的话）
+        if (hasOldData) {
+            const fadeOutPromises = oldRows.map(tr => {
+                return new Promise(resolve => {
+                    tr.classList.add('tr-fade-out');
+                    tr.addEventListener('animationend', resolve, { once: true });
+                });
+            });
+            Promise.all(fadeOutPromises).then(() => {
+            // 此时旧行已不可见，可以安全地发送请求
+                fetchAndUpdateTable(url, tbody, startDate, endDate);
+            });
+        } else {
+            // 如果没有旧数据（如初始状态、空状态），直接显示加载提示
+            tbody.innerHTML = '<tr><td colspan="6" class="loading">加载中...</td></tr>';
+            fetchAndUpdateTable(url, tbody, startDate, endDate);
+        }
     }
     
     // 2. 发送请求获取新数据
@@ -691,6 +706,8 @@
             // 4. 创建并插入新行，它们会自动应用原有的 fadeIn 动画
             data.forEach((row, index) => {
                 const tr = document.createElement('tr');
+                const escapedName = escapeHtml(row.name);
+                const escapedDate = escapeHtml(row.date);
                 tr.innerHTML = `
                     <td>${index + 1}</td>
                     <td><a href="/user/${row.name}" style="color: #3498db; text-decoration: none; font-weight: 600;">${row.name}</a></td>
@@ -721,7 +738,7 @@
             isUpdatingRanking = false;
         });
     }
-}
+
     
     function applyFilter() {
         fetchRanking(document.getElementById('sortOption').value);

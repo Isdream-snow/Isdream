@@ -81,20 +81,20 @@
                 <tr>
                     <tr id="row-{{ ride[0] }}">
                         <td><input type="checkbox" class="row-checkbox" value="{{ ride[0] }}" onchange="updateSelectionCount()"></td>
-                    <td>{{ ride[0] }}</td> <!-- id -->
+                    <td>{{ ride[0]|e }}</td> <!-- id -->
                     <td>
                         {% if ride[5] %} <!-- is_anonymous -->
-                            <span class="anon-badge">匿名</span> {{ ride[6] }} <!-- anonymous_id -->
-                            <br><small style="color: #95a5a6;">(原名: {{ ride[1] }})</small>
+                            <span class="anon-badge">匿名</span> {{ ride[6]|e }} <!-- anonymous_id -->
+                            <br><small style="color: #95a5a6;">(原名: {{ ride[1]|e }})</small>
                         {% else %}
-                            <strong>{{ ride[1] }}</strong> <!-- name -->
+                            <strong>{{ ride[1]|e }}</strong> <!-- name -->
                         {% endif %}
                     </td>
-                    <td>{{ "%.2f"|format(ride[2]) }}</td> <!-- distance -->
-                    <td>{{ "%.1f"|format(ride[3]) }}</td> <!-- time -->
+                    <td>{{ "%.2f"|format(ride[2]|e) }}</td> <!-- distance -->
+                    <td>{{ "%.1f"|format(ride[3]|e) }}</td> <!-- time -->
                     <td>{{ ride[4] }}</td> <!-- date -->
                     <td>
-                        {% if ride[5] %}
+                        {% if ride[5]|e %}
                             <span class="anon-badge">已匿名</span>
                         {% else %}
                             <span style="color: #27ae60;">公开</span>

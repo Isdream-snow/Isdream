@@ -1,16 +1,62 @@
 from flask import Flask, render_template, request, jsonify, session, redirect, send_file
 from datetime import datetime
+from collections import defaultdict
+import time
 import sqlite3
 import hashlib
 import os
 import secrets 
+import random
 
+ip_submit_count = defaultdict(list)
+IP_LIMIT = 5  # 每个IP每分钟最多5次提交
+IP_BLOCK_TIME = 300  # 违规IP封锁5分钟
+blocked_ips = {}
+attack_log = []
 
 
 ADMIN_PASSWORD = "ZUISHUAIleiting666"
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
 DATABASE = 'database.db'
+def generate_math_captcha():
+    """生成算术验证码"""
+    ops = ['+', '-', '*']
+    a = random.randint(1, 10)
+    b = random.randint(1, 10)
+    op = random.choice(ops)
+    
+    if op == '+':
+        answer = a + b
+    elif op == '-':
+        answer = a - b
+    else:
+        answer = a * b
+    
+    question = f"{a} {op} {b} = ?"
+    return question, str(answer)
+
+def check_ip_limit(ip):
+    """检查IP是否超出限制"""
+    now = time.time()
+    
+    # 检查是否在封锁名单
+    if ip in blocked_ips:
+        if now - blocked_ips[ip] < IP_BLOCK_TIME:
+            return False, f"IP已被临时封锁,请{int((IP_BLOCK_TIME - (now - blocked_ips[ip]))/60)}分钟后再试"
+        else:
+            del blocked_ips[ip]
+    
+    # 清理1分钟前的记录
+    if ip in ip_submit_count:
+        ip_submit_count[ip] = [t for t in ip_submit_count[ip] if now - t < 60]
+    
+    # 检查频率
+    if ip in ip_submit_count and len(ip_submit_count[ip]) >= IP_LIMIT:
+        blocked_ips[ip] = now
+        return False, "提交频率过高,IP已被临时封锁"
+    
+    return True, ""
 
 # 初始化数据库
 def init_db():
@@ -40,6 +86,116 @@ def get_ranking():
     results = cursor.fetchall()
     conn.close()
     return results
+def log_attack(ip, reason, details=""):
+    """记录攻击日志"""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_entry = {
+        "timestamp": timestamp,
+        "ip": ip,
+        "reason": reason,
+        "details": details
+    }
+    attack_log.append(log_entry)
+    
+    # 只保留最近1000条日志
+    if len(attack_log) > 1000:
+        attack_log.pop(0)
+    
+    print(f"[攻击日志] {timestamp} - {ip} - {reason}")
+
+
+# 添加攻击日志查看路由
+@app.route('/admin/attack_logs')
+def view_attack_logs():
+    """查看攻击日志"""
+    if not session.get('is_admin'):
+        return redirect('/admin/login')
+    
+    return render_template('attack_logs.html', logs=attack_log)
+
+@app.route('/refresh_captcha')
+def refresh_captcha():
+    """刷新验证码"""
+    question, answer = generate_math_captcha()
+    session['captcha_answer'] = answer
+    return jsonify({
+        "success": True,
+        "question": question
+    })
+
+@app.route('/admin/batch_delete', methods=['POST'])
+def batch_delete():
+    """批量删除记录"""
+    if not session.get('is_admin'):
+        return jsonify({"success": False, "error": "未登录"}), 403
+    
+    data = request.json
+    if not data or 'ids' not in data:
+        return jsonify({"success": False, "error": "未提供删除ID列表"}), 400
+    
+    ids = data['ids']
+    if not isinstance(ids, list) or len(ids) == 0:
+        return jsonify({"success": False, "error": "ID列表格式错误"}), 400
+    
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    deleted_count = 0
+    
+    try:
+        # 使用IN子句批量删除
+        placeholders = ','.join(['?'] * len(ids))
+        cursor.execute(f'DELETE FROM rides WHERE id IN ({placeholders})', ids)
+        conn.commit()
+        deleted_count = cursor.rowcount
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        conn.close()
+    
+    return jsonify({
+        "success": True, 
+        "message": f"成功删除 {deleted_count} 条记录",
+        "deleted_count": deleted_count
+    })
+
+@app.route('/news')
+def news_page():
+    """新闻公告页面"""
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    
+    # 1. 获取本月骑行冠军
+    current_month = datetime.now().strftime('%Y-%m')
+    cursor.execute('''
+        SELECT name, SUM(distance) as total_distance
+        FROM rides 
+        WHERE strftime('%Y-%m', date) = ? AND time > 0
+        GROUP BY name 
+        ORDER BY total_distance DESC
+        LIMIT 3
+    ''', (current_month,))
+    monthly_champs = cursor.fetchall()
+    
+    # 2. 获取统计数据
+    cursor.execute('SELECT COUNT(DISTINCT name) FROM rides')
+    total_riders = cursor.fetchone()[0]
+    
+    cursor.execute('SELECT SUM(distance) FROM rides WHERE time > 0')
+    total_distance = cursor.fetchone()[0] or 0
+    
+    cursor.execute('SELECT COUNT(*) FROM rides WHERE time > 0')
+    total_rides = cursor.fetchone()[0]
+    
+    conn.close()
+    current_month_display = datetime.now().strftime('%Y年%m月')
+    return render_template('news.html',
+                          monthly_champs=monthly_champs,
+                          total_riders=total_riders,
+                          total_distance=total_distance,
+                          total_rides=total_rides,
+                          current_month_display=current_month_display)
+
 
 @app.route('/admin/download_db')
 def download_database():
@@ -361,7 +517,34 @@ def user_stats(identifier):
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
+
     if request.method == 'POST':
+        user_answer = request.form.get('captcha', '').strip()
+        correct_answer = session.get('captcha_answer', '')
+    
+        if not user_answer or user_answer != correct_answer:
+            return jsonify({
+                "success": False, 
+                "message": f"验证码错误，正确答案是 {correct_answer}"
+            }), 400
+    
+        # 验证成功后清除
+        session.pop('captcha_answer', None)
+
+        client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+        if ',' in client_ip:
+            client_ip = client_ip.split(',')[0].strip()
+
+        is_allowed, msg = check_ip_limit(client_ip)
+        if not is_allowed:
+            log_attack(client_ip, "频率限制", f"1分钟内提交{len(ip_submit_count.get(client_ip, []))}次")
+            return jsonify({"success": False, "message": msg}), 429
+
+        # 记录本次提交
+        if client_ip not in ip_submit_count:
+            ip_submit_count[client_ip] = []
+        ip_submit_count[client_ip].append(time.time())
+
         name = request.form['name']
         distance = float(request.form['distance'])
         time = float(request.form['time'])
@@ -407,8 +590,12 @@ def index():
         ranking = get_ranking()
     except sqlite3.OperationalError:
         ranking = []
+    captcha_question, captcha_answer = generate_math_captcha()
+    session['captcha_answer'] = captcha_answer
     
-    return render_template('index.html', ranking=ranking)
+    return render_template('index.html', 
+                            ranking=ranking,
+                            captcha_question=captcha_question)
 
 @app.route('/get_ranking')
 def get_ranking_json():

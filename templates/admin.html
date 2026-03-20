@@ -37,7 +37,19 @@
         <a href="/admin/logout" style="color: #e74c3c; text-decoration: none;">退出登录</a>
     </div>
         <h1>🚴 骑行数据管理后台</h1>
-        
+        <div style="margin: 20px 0; padding: 15px; background: #fff3cd; border-radius: 8px;">
+            <h3 style="color: #856404;">⚠️ 批量操作</h3>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <button onclick="selectAllRows()" style="padding: 8px 15px; background: #6c757d; color: white; border: none; border-radius: 4px;">全选</button>
+                <button onclick="deselectAllRows()" style="padding: 8px 15px; background: #6c757d; color: white; border: none; border-radius: 4px;">取消全选</button>
+                <button onclick="deleteSelected()" style="padding: 8px 15px; background: #dc3545; color: white; border: none; border-radius: 4px;">删除选中</button>
+                <button onclick="exportSelected()" style="padding: 8px 15px; background: #28a745; color: white; border: none; border-radius: 4px;">导出选中</button>
+        </div>
+            <p style="margin-top: 10px; color: #856404; font-size: 0.9rem;">
+                已选择 <span id="selectedCount">0</span> 条记录
+            </p>
+    </div>
+
         <div class="stats-bar">
             <div class="stat">
                 <div class="label">总记录数</div>
@@ -54,6 +66,7 @@
         <table>
             <thead>
                 <tr>
+                    <th width="50"><input type="checkbox" id="selectAll" onchange="toggleAll(this)"></th>
                     <th>ID</th>
                     <th>姓名/匿名ID</th>
                     <th>距离 (km)</th>
@@ -66,6 +79,8 @@
             <tbody>
                 {% for ride in rides %}
                 <tr>
+                    <tr id="row-{{ ride[0] }}">
+                        <td><input type="checkbox" class="row-checkbox" value="{{ ride[0] }}" onchange="updateSelectionCount()"></td>
                     <td>{{ ride[0] }}</td> <!-- id -->
                     <td>
                         {% if ride[5] %} <!-- is_anonymous -->
@@ -98,6 +113,66 @@
     </div>
 
     <script>
+        function toggleAll(checkbox) {
+            const checkboxes = document.querySelectorAll('.row-checkbox');
+            checkboxes.forEach(cb => cb.checked = checkbox.checked);
+            updateSelectionCount();
+        }
+
+        function selectAllRows() {
+            document.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = true);
+            document.getElementById('selectAll').checked = true;
+            updateSelectionCount();
+        }
+
+        function deselectAllRows() {
+            document.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = false);
+            document.getElementById('selectAll').checked = false;
+            updateSelectionCount();
+        }
+
+        function updateSelectionCount() {
+            const selected = document.querySelectorAll('.row-checkbox:checked').length;
+            document.getElementById('selectedCount').textContent = selected;
+        }   
+
+        async function deleteSelected() {
+            const selected = Array.from(document.querySelectorAll('.row-checkbox:checked'))
+            .map(cb => parseInt(cb.value));
+    
+            if (selected.length === 0) {
+                alert('请先选择要删除的记录');
+                return;
+            }
+    
+            if (!confirm(`确定要删除选中的 ${selected.length} 条记录吗？此操作不可撤销！`)) {
+                return;
+            }
+    
+            try {
+                const response = await fetch(`/admin/batch_delete`, {
+                    method: 'POST',
+                    headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ ids: selected })
+            });
+        
+            const result = await response.json();
+        
+            if (result.success) {
+                alert(`成功删除 ${result.deleted_count} 条记录`);
+                location.reload();
+            } else {
+                alert('删除失败: ' + result.error);
+            }
+        } catch (error) {
+            console.error('批量删除失败:', error);
+            alert('批量删除过程中发生错误');
+        }
+}
+
+
         // 检查上次备份时间
         function checkBackupStatus() {
         const lastBackup = localStorage.getItem('last_backup_time');

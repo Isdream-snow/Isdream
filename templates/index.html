@@ -417,11 +417,110 @@
         }
     }
 
+    /* 侧边栏导航样式 */
+        .sidebar-nav {
+            position: fixed;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: white;
+            border-radius: 12px;
+            padding: 20px 10px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            z-index: 999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .sidebar-nav a {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-decoration: none;
+            color: #7f8c8d;
+            padding: 12px 8px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            width: 100%;
+            text-align: center;
+        }   
+
+        .sidebar-nav a:hover {
+            background-color: #f1f8ff;
+            color: #3498db;
+            transform: translateX(3px);
+        }
+
+        .sidebar-nav a.active {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            box-shadow: 0 4px 10px rgba(52, 152, 219, 0.3);
+        }
+
+        .sidebar-nav .icon {
+            font-size: 1.5rem;
+            margin-bottom: 5px;
+        }
+
+        .sidebar-nav .text {
+            font-size: 0.8rem;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        /* 为移动端优化 */
+        @media (max-width: 1100px) {
+            .sidebar-nav {
+                position: fixed;
+                bottom: 0;
+                top: auto;
+                left: 0;
+                right: 0;
+                transform: none;
+                flex-direction: row;
+                justify-content: space-around;
+                padding: 10px 5px;
+                border-radius: 15px 15px 0 0;
+                box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.1);
+        }
+    
+            .sidebar-nav a {
+                padding: 8px 5px;
+            }
+    
+            .sidebar-nav .text {
+                font-size: 0.7rem;
+            }
+    
+            .sidebar-nav .icon {
+                font-size: 1.3rem;
+                margin-bottom: 3px;
+            }
+    
+        /* 在移动端，为主内容增加底部内边距，防止被侧边栏遮挡 */
+            .container {
+                padding-bottom: 80px;
+            }
+    }
 </style>
 </head>
 <body>
+    <nav class="sidebar-nav">
+        <a href="/" class="active">
+            <div class="icon">🚴</div>
+            <div class="text">骑行数据</div>
+        </a>
+        <a href="/news">
+            <div class="icon">📰</div>
+            <div class="text">新闻公告</div>
+        </a>
+    </nav>
     <div class="container">
-    <h1>袁庚书院骑行社官方网站version0.0.6</h1>
+    <a href="/news" style="color: inherit; text-decoration: none; margin-right: 15px;">📰 新闻公告</a>
+    <h1>袁庚书院骑行社官方网站version0.0.7</h1>
+    
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
     <h2 style="margin: 0; border: none; padding: 0; color: #2c3e50;">填写新记录</h2>
     <button type="button" id="toggleFormBtn" style="padding: 6px 12px; background: #95a5a6; color: white; border: none; border-radius: 4px; cursor: pointer;">
@@ -455,6 +554,19 @@
         </div>
         <div class="form-group" style="grid-column: span 1;">
             <button type="submit" style="width: 100%;">提交数据</button>
+        </div>
+        <div class="form-group">
+            <label for="captcha">验证码</label>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <input type="text" id="captcha" name="captcha" required 
+                    placeholder="{{ captcha_question if captcha_question else '1 + 1 = ?' }}"
+                    style="flex: 1;">
+                <button type="button" onclick="refreshCaptcha()" 
+                    style="padding: 8px 12px; background: #6c757d; color: white; border: none; border-radius: 4px;">
+                    刷新
+                </button>
+            </div>
+            <small style="color: #6c757d;">请计算结果，防止机器人提交</small>
         </div>
     </form>
     </div>
@@ -502,6 +614,15 @@
     <a href="/admin/login" style="color: inherit; text-decoration: none;">管理</a>
 </div>
 <script>
+    function refreshCaptcha() {
+    fetch('/refresh_captcha')
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('captcha').placeholder = data.question;
+            }
+        });
+    }       
     let searchTimer = null;
     function debouncedSearch() {
         clearTimeout(searchTimer);

@@ -378,6 +378,9 @@ def admin_panel():
     all_rides = cursor.fetchall()
     conn.close()
     
+    print(f"查询到 {len(all_rides)} 条记录")
+    for i, ride in enumerate(all_rides[:5]):  # 只打印前5条
+        print(f"记录 {i}: {ride}")
     # 3. 渲染管理模板
     return render_template('admin.html', rides=all_rides)
 # 在 app.py 中添加新路由

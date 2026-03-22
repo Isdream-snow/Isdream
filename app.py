@@ -124,33 +124,33 @@ def check_ip_limit(ip):
 
 # 初始化数据库
 def init_db():
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        if USING_POSTGRESQL:
-        # PostgreSQL 建表语句 (注意语法差异)
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS rides (
-                    id SERIAL PRIMARY KEY,
-                    name VARCHAR(100) NOT NULL,
-                    distance DECIMAL(10,2) NOT NULL, 
-                    time DECIMAL(10,1) NOT NULL,      
-                    date DATE NOT NULL DEFAULT CURRENT_DATE,
-                    is_anonymous BOOLEAN DEFAULT FALSE, 
-                    anonymous_id TEXT      
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if USING_POSTGRESQL:
+    # PostgreSQL 建表语句 (注意语法差异)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS rides (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                distance DECIMAL(10,2) NOT NULL, 
+                time DECIMAL(10,1) NOT NULL,      
+                date DATE NOT NULL DEFAULT CURRENT_DATE,
+                is_anonymous BOOLEAN DEFAULT FALSE, 
+                anonymous_id TEXT      
             )
         ''')
-        else:
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS rides (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL,
-                    distance REAL NOT NULL, 
-                    time REAL NOT NULL,      
-                    date DATE NOT NULL DEFAULT (date('now')),
-                    is_anonymous BOOLEAN DEFAULT 0, 
-                    anonymous_id TEXT      
-                )
-            ''')
+    else:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS rides (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                distance REAL NOT NULL, 
+                time REAL NOT NULL,      
+                date DATE NOT NULL DEFAULT (date('now')),
+                is_anonymous BOOLEAN DEFAULT 0, 
+                anonymous_id TEXT      
+            )
+         ''')
     conn.commit()
     conn.close()
 

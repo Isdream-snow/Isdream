@@ -5,12 +5,14 @@ import time as time_module
 import sqlite3
 import hashlib
 import os
+import psycopg2
 import secrets 
 import random
 import html
 import re
 import shutil
 import tempfile
+from urllib.parse import urlparse
 
 ip_submit_count = defaultdict(list)
 IP_LIMIT = 5  # 每个IP每分钟最多5次提交
@@ -22,7 +24,24 @@ attack_log = []
 ADMIN_PASSWORD = "ZUISHUAI6"
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
-DATABASE = 'database.db'
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
+if DATABASE_URL:
+    # 解析Render的PostgreSQL URL
+    result = urlparse(DATABASE_URL)
+    DB_CONFIG = {
+        'dbname': result.path[1:],
+        'user': result.username,
+        'password': result.password,
+        'host': result.hostname,
+        'port': result.port,
+    }
+    USING_POSTGRESQL = True
+else:
+    # 本地开发时，可回退到SQLite（便于测试）
+    USING_POSTGRESQL = False
+    import sqlite3  # 本地开发时才导入
+    return conn
 
 def sanitize_input(input_string, max_length=50):
     """
@@ -100,8 +119,23 @@ def check_ip_limit(ip):
 
 # 初始化数据库
 def init_db():
-        conn = sqlite3.connect(DATABASE)
+        conn = get_db_connection()
         cursor = conn.cursor()
+        if USING_POSTGRESQL:
+        # PostgreSQL 建表语句 (注意语法差异)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS rides (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                distance DECIMAL(10,2) NOT NULL, 
+                time DECIMAL(10,1) NOT NULL,      
+                date DATE NOT NULL DEFAULT CURRENT_DATE,
+                is_anonymous BOOLEAN DEFAULT FALSE, 
+                anonymous_id TEXT      
+            )
+        ''')
+    else:
+        # 保留原有的SQLite建表语句，用于本地开发
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS rides (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -113,14 +147,15 @@ def init_db():
                 anonymous_id TEXT      
             )
         ''')
-        conn.commit()
-        conn.close()
+    conn.commit()
+    conn.close()
+
 
 with app.app_context():
     init_db()
 # 获取排行榜数据（按距离降序）
 def get_ranking():
-    conn = sqlite3.connect(DATABASE)
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT name, distance, time, date FROM rides ORDER BY distance DESC')
     results = cursor.fetchall()
@@ -177,7 +212,7 @@ def batch_delete():
     if not isinstance(ids, list) or len(ids) == 0:
         return jsonify({"success": False, "error": "ID列表格式错误"}), 400
     
-    conn = sqlite3.connect(DATABASE)
+    conn = get_db_connection()
     cursor = conn.cursor()
     deleted_count = 0
     
@@ -202,7 +237,7 @@ def batch_delete():
 @app.route('/news')
 def news_page():
     """新闻公告页面"""
-    conn = sqlite3.connect(DATABASE)
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     # 1. 获取本月骑行冠军
@@ -371,7 +406,7 @@ def admin_panel():
         return redirect('/admin/login')
     
     # 2. 获取所有数据
-    conn = sqlite3.connect(DATABASE)
+    conn = get_db_connection()
     # 按日期倒序排列，方便查看最新数据
     cursor = conn.cursor()
     cursor.execute('''
@@ -396,7 +431,7 @@ def admin_delete(ride_id):
         return jsonify({"success": False, "error": "未登录或会话已过期。"}), 403
     
     # 2. 执行删除
-    conn = sqlite3.connect(DATABASE)
+    conn = get_db_connection()
     cursor = conn.cursor()
     try:
         cursor.execute('DELETE FROM rides WHERE id = ?', (ride_id,))
@@ -447,7 +482,7 @@ def admin_logout():
 @app.route('/user/<identifier>')
 def user_stats(identifier):
     """个人骑行统计页面"""
-    conn = sqlite3.connect(DATABASE)
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     # 1. 获取用户所有骑行记录
@@ -630,7 +665,7 @@ def index():
             anonymous_id = None
         # 处理上传数据
 
-        conn = sqlite3.connect(DATABASE)
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO rides (name, distance, time, date, is_anonymous, anonymous_id) 
@@ -659,7 +694,7 @@ def get_ranking_json():
     start_date = request.args.get('start_date', '')
     end_date = request.args.get('end_date', '')
     search_name = request.args.get('search_name', '')
-    conn = sqlite3.connect(DATABASE)
+    conn = get_db_connection()
     cursor = conn.cursor()
     base_query = '''
         SELECT name, 

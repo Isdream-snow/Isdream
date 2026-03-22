@@ -131,8 +131,8 @@ def check_ip_limit(ip):
 # 初始化数据库
 def init_db():
         """初始化数据库表结构"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
+        conn = get_db_connection()
+        cursor = conn.cursor()
     
     if USING_POSTGRESQL:
         # PostgreSQL 建表语句 (注意语法差异)
@@ -688,7 +688,7 @@ def index():
             raise e
         finally:
             conn.close()
-            
+
         return jsonify({
             "success": True,
             "message": "数据提交成功！"+ ("（已匿名）" if is_anonymous else "")

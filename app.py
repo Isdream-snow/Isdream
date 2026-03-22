@@ -132,21 +132,20 @@ def init_db():
                     date DATE NOT NULL DEFAULT CURRENT_DATE,
                     is_anonymous BOOLEAN DEFAULT FALSE, 
                     anonymous_id TEXT      
-                )
-            ''')
-    else:
-        # 保留原有的SQLite建表语句，用于本地开发
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS rides (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                distance REAL NOT NULL, 
-                time REAL NOT NULL,      
-                date DATE NOT NULL DEFAULT (date('now')),
-                is_anonymous BOOLEAN DEFAULT 0, 
-                anonymous_id TEXT      
             )
         ''')
+        else:
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS rides (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    distance REAL NOT NULL, 
+                    time REAL NOT NULL,      
+                    date DATE NOT NULL DEFAULT (date('now')),
+                    is_anonymous BOOLEAN DEFAULT 0, 
+                    anonymous_id TEXT      
+                )
+            ''')
     conn.commit()
     conn.close()
 

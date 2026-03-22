@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, jsonify, session, redirect, s
 from datetime import datetime
 from collections import defaultdict
 import time as time_module
-import sqlite3
+#import sqlite3
 import hashlib
 import os
 import secrets 
@@ -11,6 +11,8 @@ import html
 import re
 import shutil
 import tempfile
+import psycopg2
+from urllib.parse import urlparse
 
 ip_submit_count = defaultdict(list)
 IP_LIMIT = 5  # 每个IP每分钟最多5次提交
@@ -22,7 +24,35 @@ attack_log = []
 ADMIN_PASSWORD = "ZUISHUAI6"
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
-DATABASE = 'database.db'
+#DATABASE = 'database.db'
+
+DATABASE_URL = os.environ.get('DATABASE_URL')
+if DATABASE_URL:
+    # 解析Render的PostgreSQL URL
+    result = urlparse(DATABASE_URL)
+    DB_CONFIG = {
+        'dbname': result.path[1:],
+        'user': result.username,
+        'password': result.password,
+        'host': result.hostname,
+        'port': result.port,
+    }
+    USING_POSTGRESQL = True
+else:
+    # 本地开发时，可回退到SQLite（便于测试）
+    USING_POSTGRESQL = False
+    import sqlite3  # 本地开发时才导入
+
+def get_db_connection():
+    """获取数据库连接(自动适配PostgreSQL或SQLite)"""
+    if USING_POSTGRESQL:
+        conn = psycopg2.connect(**DB_CONFIG)
+        # PostgreSQL需要设置自动提交，或手动管理事务
+        conn.autocommit = False
+    else:
+        # 本地开发回退到SQLite
+        conn = sqlite3.connect('database.db')
+    return conn
 
 def sanitize_input(input_string, max_length=50):
     """
@@ -100,8 +130,25 @@ def check_ip_limit(ip):
 
 # 初始化数据库
 def init_db():
-        conn = sqlite3.connect(DATABASE)
-        cursor = conn.cursor()
+        """初始化数据库表结构"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    if USING_POSTGRESQL:
+        # PostgreSQL 建表语句 (注意语法差异)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS rides (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                distance DECIMAL(10,2) NOT NULL, 
+                time DECIMAL(10,1) NOT NULL,      
+                date DATE NOT NULL DEFAULT CURRENT_DATE,
+                is_anonymous BOOLEAN DEFAULT FALSE, 
+                anonymous_id TEXT      
+            )
+        ''')
+    else:
+        # 保留原有的SQLite建表语句，用于本地开发
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS rides (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -113,8 +160,8 @@ def init_db():
                 anonymous_id TEXT      
             )
         ''')
-        conn.commit()
-        conn.close()
+    conn.commit()
+    conn.close()
 
 with app.app_context():
     init_db()
@@ -630,14 +677,18 @@ def index():
             anonymous_id = None
         # 处理上传数据
 
-        conn = sqlite3.connect(DATABASE)
+        conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO rides (name, distance, time, date, is_anonymous, anonymous_id) 
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''',(name, distance, time_val, date, 1 if is_anonymous else 0, anonymous_id))
-        conn.commit()
-        conn.close()
+        try:
+            # 注意：PostgreSQL使用 %s 作为占位符，而不是 ?
+            cursor.execute('INSERT INTO rides ... VALUES (%s, %s, %s, %s, %s, %s)', params)
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+            
         return jsonify({
             "success": True,
             "message": "数据提交成功！"+ ("（已匿名）" if is_anonymous else "")

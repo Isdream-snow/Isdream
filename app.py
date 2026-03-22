@@ -5,14 +5,12 @@ import time as time_module
 import sqlite3
 import hashlib
 import os
-import psycopg2
 import secrets 
 import random
 import html
 import re
 import shutil
 import tempfile
-from urllib.parse import urlparse
 
 ip_submit_count = defaultdict(list)
 IP_LIMIT = 5  # 每个IP每分钟最多5次提交
@@ -24,29 +22,7 @@ attack_log = []
 ADMIN_PASSWORD = "ZUISHUAI6"
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
-DATABASE_URL = os.environ.get('DATABASE_URL')
-
-def get_db_placeholder():
-    """返回当前数据库类型的占位符"""
-    return '%s' if USING_POSTGRESQL else '?'
-
-def get_db_connection():
-    if DATABASE_URL:
-        # 解析Render的PostgreSQL URL
-        result = urlparse(DATABASE_URL)
-        DB_CONFIG = {
-            'dbname': result.path[1:],
-            'user': result.username,
-            'password': result.password,
-            'host': result.hostname,
-            'port': result.port,
-        }
-        USING_POSTGRESQL = True
-    else:
-        # 本地开发时，可回退到SQLite（便于测试）
-        USING_POSTGRESQL = False
-        import sqlite3  # 本地开发时才导入
-    return conn
+DATABASE = 'database.db'
 
 def sanitize_input(input_string, max_length=50):
     """
@@ -124,22 +100,8 @@ def check_ip_limit(ip):
 
 # 初始化数据库
 def init_db():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    if USING_POSTGRESQL:
-    # PostgreSQL 建表语句 (注意语法差异)
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS rides (
-                id SERIAL PRIMARY KEY,
-                name VARCHAR(100) NOT NULL,
-                distance DECIMAL(10,2) NOT NULL, 
-                time DECIMAL(10,1) NOT NULL,      
-                date DATE NOT NULL DEFAULT CURRENT_DATE,
-                is_anonymous BOOLEAN DEFAULT FALSE, 
-                anonymous_id TEXT      
-            )
-        ''')
-    else:
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS rides (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -150,16 +112,15 @@ def init_db():
                 is_anonymous BOOLEAN DEFAULT 0, 
                 anonymous_id TEXT      
             )
-         ''')
-    conn.commit()
-    conn.close()
-
+        ''')
+        conn.commit()
+        conn.close()
 
 with app.app_context():
     init_db()
 # 获取排行榜数据（按距离降序）
 def get_ranking():
-    conn = get_db_connection()
+    conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
     cursor.execute('SELECT name, distance, time, date FROM rides ORDER BY distance DESC')
     results = cursor.fetchall()
@@ -216,7 +177,7 @@ def batch_delete():
     if not isinstance(ids, list) or len(ids) == 0:
         return jsonify({"success": False, "error": "ID列表格式错误"}), 400
     
-    conn = get_db_connection()
+    conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
     deleted_count = 0
     
@@ -241,11 +202,11 @@ def batch_delete():
 @app.route('/news')
 def news_page():
     """新闻公告页面"""
-    conn = get_db_connection()
+    conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
     
     # 1. 获取本月骑行冠军
-    current_month = datetime.now().EXTRACT(YEAR_MONTH FROM date)
+    current_month = datetime.now().strftime('%Y-%m')
     cursor.execute('''
         SELECT name, SUM(distance) as total_distance
         FROM rides 
@@ -267,7 +228,7 @@ def news_page():
     total_rides = cursor.fetchone()[0]
     
     conn.close()
-    current_month_display = datetime.now().EXTRACT(YEAR_MONTH FROM date)
+    current_month_display = datetime.now().strftime('%Y年%m月')
     return render_template('news.html',
                           monthly_champs=monthly_champs,
                           total_riders=total_riders,
@@ -410,7 +371,7 @@ def admin_panel():
         return redirect('/admin/login')
     
     # 2. 获取所有数据
-    conn = get_db_connection()
+    conn = sqlite3.connect(DATABASE)
     # 按日期倒序排列，方便查看最新数据
     cursor = conn.cursor()
     cursor.execute('''
@@ -435,7 +396,7 @@ def admin_delete(ride_id):
         return jsonify({"success": False, "error": "未登录或会话已过期。"}), 403
     
     # 2. 执行删除
-    conn = get_db_connection()
+    conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
     try:
         cursor.execute('DELETE FROM rides WHERE id = ?', (ride_id,))
@@ -486,7 +447,7 @@ def admin_logout():
 @app.route('/user/<identifier>')
 def user_stats(identifier):
     """个人骑行统计页面"""
-    conn = get_db_connection()
+    conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
     
     # 1. 获取用户所有骑行记录
@@ -669,11 +630,11 @@ def index():
             anonymous_id = None
         # 处理上传数据
 
-        conn = get_db_connection()
+        conn = sqlite3.connect(DATABASE)
         cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO rides (name, distance, time, date, is_anonymous, anonymous_id) 
-            VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+            VALUES (?, ?, ?, ?, ?, ?)
         ''',(name, distance, time_val, date, 1 if is_anonymous else 0, anonymous_id))
         conn.commit()
         conn.close()
@@ -698,7 +659,7 @@ def get_ranking_json():
     start_date = request.args.get('start_date', '')
     end_date = request.args.get('end_date', '')
     search_name = request.args.get('search_name', '')
-    conn = get_db_connection()
+    conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
     base_query = '''
         SELECT name, 
